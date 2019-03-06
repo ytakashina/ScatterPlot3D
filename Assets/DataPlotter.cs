@@ -1,20 +1,27 @@
 ﻿using System;
+using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Accord.IO;
+using Accord.Math;
+using Extensions;
+
 
 public class DataPlotter : MonoBehaviour
 {
-    public string InputFile;
-    private List<Dictionary<string, object>> _points;
-    private List<string> _columns;
+    public string InputPath;
+    public float PlotScale;
 
-    public int ColumnX;
-    public int ColumnY;
-    public int ColumnZ;
-    public string xName => _columns[ColumnX];
-    public string yName => _columns[ColumnY];
-    public string zName => _columns[ColumnZ];
+    private double[][] _points;
+    private string[] _columns;
+
+    public int AxisX = 1;
+    public int AxisY = 2;
+    public int AxisZ = 3;
+    public string NameAxisX => _columns[AxisX];
+    public string NameAxisY => _columns[AxisY];
+    public string NameAxisZ => _columns[AxisZ];
     public GameObject PointPrefab;
     public GameObject PointHolder;
 
@@ -22,23 +29,24 @@ public class DataPlotter : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        _points = CSVReader.Read(InputFile);
-        _columns = new List<string>(_points[1].Keys);
-
-        foreach(var point in _points)
+        var table = new CsvReader(InputPath, true);
+        _columns = table.GetFieldHeaders();
+        _points = table.ToJagged().Get(null, 1, 5);
+        _points = Tools.Scale(Vector.Zeros(4), Vector.Ones(4), _points);
+        foreach (var point in _points)
         {
-            var x = Convert.ToSingle(point[xName]);
-            var y = Convert.ToSingle(point[yName]);
-            var z = Convert.ToSingle(point[zName]);
-            var dataPoint = Instantiate(PointPrefab, new Vector3(x, y, z), Quaternion.identity);
+            var indices = new[] { AxisX, AxisY, AxisZ };
+            var p = point.Get(indices).Select(v => (float) v).ToArray();
+            var dataPoint = Instantiate(PointPrefab, p.ToUnityVector3() * PlotScale, Quaternion.identity);
             dataPoint.transform.parent = PointHolder.transform;
-            dataPoint.transform.name = $"{point[xName]}, {point[yName]}, {point[zName]}";
+            dataPoint.transform.name = point.ToString(DefaultArrayFormatProvider.CurrentCulture);
+            dataPoint.GetComponent<Renderer>().material.color = new Color(p[0], p[1], p[2], 1.0f);
         }
     }
 
     // Update is called once per frame
     void Update()
     {
-        
+
     }
 }
